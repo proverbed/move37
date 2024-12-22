@@ -7,12 +7,12 @@ import numpy as np
 import gymnasium as gym
 from collections import defaultdict
 
-GAMMA = 1 # discounting
+GAMMA = 0.9 # discounting
 ALPHA = 1/5000 # step size
 EPSILON = 0.1 # sprinkle in some randomness for exploration sake
-N_EPISODES = 10000000
+N_EPISODES = 1
 
-env = gym.make('Taxi-v3')
+env = gym.make('Taxi-v3', render_mode="ansi")
 
 # epsilon greedy action selection
 def epsilon_action(a, random, eps=0.1):
@@ -28,47 +28,37 @@ def discountedReturn(states_actions_rewards, GAMMA):
         r += ((GAMMA ** index) * val[2])
     return r
 
-
-def get_probs(Q_state, epsilon, nA):
-    '''
-    Obtains action probabilities corresponding to epsilon-greedy policy
-    ___Argumnets___
-        Q_state : (subset of Q) array containing action-value functions for a single state
-        epsilon : p(equiprobable random policy)  &&  1 - epsilon : p(greedy policy)
-        nA      : # of actions
-    '''
-    # 1. Initialize w/ probabilities for non-greedy actions:
-    probs = np.ones(nA) * epsilon / nA
-    # 2. Set the probability for greedy action:
-    greedy_action = np.argmax(Q_state)
-    probs[greedy_action] = 1 - epsilon + epsilon / nA
-
-    return probs
-
 def play_game(Q, epsilon):
     states_actions_rewards = []
     episode_over = False
     observation, info = env.reset(seed=42)
 
     while not episode_over:
-        best_action = env.action_space.sample()
-        if observation in Q:
-            best_action, _ = max_dict(Q[observation])
+        if observation not in Q:
+            Q[observation] = {}
+
+        best_action, _ = max_dict(Q[observation])
+        if best_action is None:
+            best_action = env.action_space.sample()
+
         a = epsilon_action(best_action, env.action_space.sample(), epsilon)
+        print('observation', observation, best_action, epsilon, a)
 
         observation, reward, terminated, truncated, info = env.step(a)
+        print(env.render())
 
-        # print("action: "+ str(a))
-        # print(
-        # '[\n',
-        #     'observation: ' + str(observation), '\n',
-        #     'action: ' + str(a), '\n',
-        #     'reward: ' + str(reward), '\n',
-        #     ' ', '\n',
-        #     'terminated: ' + str(terminated), '\n',
-        #     'truncated: ' + str(truncated), '\n',
-        #     ' '
-        # '\n]')
+        print("1best_action: "+ str(best_action), "action: "+ str(a))
+        print(
+        '[\n',
+            'observation: ' + str(observation), '\n',
+            'info: ' + str(info), '\n',
+            'action: ' + str(a), '\n',
+            'reward: ' + str(reward), '\n',
+            ' ', '\n',
+            'terminated: ' + str(terminated), '\n',
+            'truncated: ' + str(truncated), '\n',
+            ' '
+        '\n]')
         states_actions_rewards.append((observation, a, reward))
         episode_over = terminated or truncated
     env.close()
@@ -96,36 +86,29 @@ def play_game(Q, epsilon):
     return states_actions_returns
 
 
-def monte_carlo(eps_start = 1.0, eps_decay = 0.97, eps_min = 0.05):
+def monte_carlo(eps_start = 1.0, eps_decay = 0.99999, eps_min = 0.05):
     nA = env.action_space.n
 
-    try:
-        with open('Q.dat', 'rb') as loaded_file:
-            Q = pickle.load(loaded_file)
-    except FileNotFoundError:
-        Q = {}
+    with open('Q.dat', 'rb') as loaded_file:
+        Q = pickle.load(loaded_file)
 
     # keep track of how much our Q values change each episode so we can know when it converges
     deltas = []
-    epsilon = eps_start
+    epsilon = EPSILON
 
     # repeat for the number of episodes specified (enough that it converges)
     for t in range(N_EPISODES):
 
         if t % 1000 == 0:
-            if (len(Q) != 0):
-                with open('Q.dat', 'wb') as file:
-                    pickle.dump(Q, file)
             print(t, epsilon)
-            # 1. Update epsilon:
-            epsilon = max(epsilon * eps_decay, eps_min)
 
-        biggest_change = 0
         # generate an episode using the current policy
-        states_actions_returns = play_game(Q, epsilon)
+        biggest_change = 0
+        states_actions_returns = play_game(Q, EPSILON)
 
         # calculate Q(s,a)
         for s, a, G in states_actions_returns:
+            # check if we have already seen s
             # first-visit Monte Carlo optimization
             old_q = Q[s][a]
             Q[s][a] = Q[s][a] + (ALPHA * (G-Q[s][a]))
@@ -142,16 +125,8 @@ def monte_carlo(eps_start = 1.0, eps_decay = 0.97, eps_min = 0.05):
 
 if __name__ == '__main__':
 
-  # print rewards
-  # print("rewards:")
-  # print_values(grid.rewards, grid)
 
   deltas = monte_carlo()
-
-  # print("final values:")
-  # print_values(V, grid)
-  # print("final policy:")
-  # print_policy(policy, grid)
 
   plt.plot(deltas)
   plt.show()
