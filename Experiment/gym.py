@@ -9,8 +9,8 @@ from collections import defaultdict
 
 GAMMA = 1 # discounting
 ALPHA = 1/5000 # step size
-EPSILON = 0.1 # sprinkle in some randomness for exploration sake
-N_EPISODES = 10000000
+EPSILON = 0.5 # sprinkle in some randomness for exploration sake
+N_EPISODES = 50000
 
 env = gym.make('Taxi-v3')
 
@@ -105,6 +105,8 @@ def monte_carlo(eps_start = 1.0, eps_decay = 0.97, eps_min = 0.05):
     except FileNotFoundError:
         Q = {}
 
+    N = {}
+
     # keep track of how much our Q values change each episode so we can know when it converges
     deltas = []
     epsilon = eps_start
@@ -127,8 +129,18 @@ def monte_carlo(eps_start = 1.0, eps_decay = 0.97, eps_min = 0.05):
         # calculate Q(s,a)
         for s, a, G in states_actions_returns:
             # first-visit Monte Carlo optimization
+
+            try:
+                if s not in N:
+                    N[s] = {}
+                if a not in N[s]:
+                    N[s][a] = 1
+                else:
+                    N[s][a] += 1
+            except KeyError:
+                print('KeyError N', N, s, a)
             old_q = Q[s][a]
-            Q[s][a] = Q[s][a] + (ALPHA * (G-Q[s][a]))
+            Q[s][a] = Q[s][a] + (1/N[s][a] * (G-Q[s][a]))
             biggest_change = max(biggest_change, np.abs(old_q - Q[s][a]))
         deltas.append(biggest_change)
 

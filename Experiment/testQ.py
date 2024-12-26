@@ -47,7 +47,7 @@ def play_game(Q, epsilon):
         observation, reward, terminated, truncated, info = env.step(a)
         print(env.render())
 
-        print("1best_action: "+ str(best_action), "action: "+ str(a))
+        print("best_action: "+ str(best_action), "action: "+ str(a))
         print(
         '[\n',
             'observation: ' + str(observation), '\n',
